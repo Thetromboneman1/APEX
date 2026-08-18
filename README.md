@@ -31,3 +31,20 @@
 </p>
 
 ---
+
+<!-- documentation-health:start -->
+
+## Current repository state
+
+![APEX system architecture](docs/architecture/apex-system-architecture.png)
+
+- **Default branch:** `main`
+- **Implementation fingerprint:** `54c34ee2f8a6783c`
+- **Detected structure:** Automation modules, GitHub Actions, Maintained documentation.
+- **Documentation contract:** editable diagram sources, committed PNG renderings,
+  resolved local image links, and generated state are checked on every commit.
+- **Refresh command:** `python3 scripts/documentation_health.py --write`
+
+See [repository state](docs/REPOSITORY_STATE.md) and the
+[architecture asset guide](docs/architecture/README.md).
+<!-- documentation-health:end -->

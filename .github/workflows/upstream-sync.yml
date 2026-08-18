@@ -1,0 +1,76 @@
+name: Sync Fork From Upstream
+
+on:
+  schedule:
+    - cron: "19 7 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      UPSTREAM_REPOSITORY: lowiqentity/APEX
+      DOWNSTREAM_BRANCH: main
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Resolve upstream main
+        id: upstream
+        run: |
+          set -euo pipefail
+          git remote add authoritative-upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          git fetch --no-tags authoritative-upstream main
+          upstream_sha=$(git rev-parse FETCH_HEAD)
+          echo "sha=$upstream_sha" >> "$GITHUB_OUTPUT"
+          echo "short=${upstream_sha:0:12}" >> "$GITHUB_OUTPUT"
+      - name: Merge into review branch
+        id: merge
+        env:
+          UPSTREAM_SHA: ${{ steps.upstream.outputs.sha }}
+          SHORT_SHA: ${{ steps.upstream.outputs.short }}
+        run: |
+          set -euo pipefail
+          if git merge-base --is-ancestor "$UPSTREAM_SHA" HEAD; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          branch="automation/upstream-sync-${SHORT_SHA}"
+          git switch -c "$branch"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          if ! git merge --no-edit "$UPSTREAM_SHA"; then
+            git diff --name-only --diff-filter=U >> "$GITHUB_STEP_SUMMARY"
+            git merge --abort
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+      - name: Validate preserved downstream behavior
+        if: steps.merge.outputs.changed == 'true'
+        run: scripts/validate-downstream.sh
+      - name: Push review branch and open pull request
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          BRANCH: ${{ steps.merge.outputs.branch }}
+          UPSTREAM_SHA: ${{ steps.upstream.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git push --set-upstream origin "$BRANCH"
+          existing=$(gh pr list --head "$BRANCH" --base "$DOWNSTREAM_BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [[ -z "$existing" ]]; then
+            gh pr create --head "$BRANCH" --base "$DOWNSTREAM_BRANCH" \
+              --title "chore: sync lowiqentity/APEX main" \
+              --body "Merges \`${UPSTREAM_REPOSITORY}@${UPSTREAM_SHA}\` through the downstream validation contract."
+          fi
