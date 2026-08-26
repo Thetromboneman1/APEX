@@ -15,12 +15,12 @@
       "subtitle": "YouTube for iOS",
       "version": "21.33.6",
       "versionDate": "2026-08-25",
-      "versionDescription": "Release v21.33.6\n\nRelease: https://files.catbox.moe/fxsx2i.ipa\r\n\r\nFixed:\r\nLots of shit.",
-      "downloadURL": "https://files.catbox.moe/fxsx2i.ipa",
+      "versionDescription": "Release v21.33.6\n\nRelease: https://files.catbox.moe/5bf4vq.ipa\r\n\r\nFixed:\r\nFix crashes.",
+      "downloadURL": "https://files.catbox.moe/5bf4vq.ipa",
       "localizedDescription": "APEX is a build of YouTube with custom enhancements.\n\nFeatures:\n- Injected with APEXHook & FlexCore",
       "iconURL": "https://raw.githubusercontent.com/lowiqentity/APEX/main/Assets/repo_icon.png",
       "tintColor": "#FF3366",
-      "size": 136233609,
+      "size": 136226642,
       "appPermissions": {
         "privacy": {
           "NSCameraUsageDescription": "This lets you create videos using the app.",
@@ -38,9 +38,9 @@
         {
           "version": "21.33.6",
           "date": "2026-08-25",
-          "localizedDescription": "Release v21.33.6\n\nRelease: https://files.catbox.moe/fxsx2i.ipa\r\n\r\nFixed:\r\nLots of shit.",
-          "downloadURL": "https://files.catbox.moe/fxsx2i.ipa",
-          "size": 136233609
+          "localizedDescription": "Release v21.33.6\n\nRelease: https://files.catbox.moe/5bf4vq.ipa\r\n\r\nFixed:\r\nFix crashes.",
+          "downloadURL": "https://files.catbox.moe/5bf4vq.ipa",
+          "size": 136226642
         },
         {
           "version": "21.32.4",
