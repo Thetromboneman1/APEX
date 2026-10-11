@@ -33,15 +33,28 @@ load_and_verify_remote_candidate() {
 }
 
 find_open_pr() {
-  gh pr list --head "$branch" --base "$DOWNSTREAM_BRANCH" --state open \
-    --json url,baseRefOid,headRefOid \
-    --jq '.[0] // empty | [.url, .baseRefOid, .headRefOid] | @tsv'
+  local records url pr_base pr_head head_repository is_cross_repository head_ref
+  # Use the paginated REST collection rather than `gh pr list`, whose default
+  # 30-result cap can hide the owned PR behind same-branch fork submissions.
+  records=$(gh api --method GET --paginate "/repos/$GITHUB_REPOSITORY/pulls" \
+    -f state=open -f base="$DOWNSTREAM_BRANCH" -f per_page=100 \
+    --jq '.[] | [.html_url, .base.sha, .head.sha, .head.repo.full_name, (.head.repo.full_name != .base.repo.full_name), .head.ref] | @tsv')
+  while IFS=$'\t' read -r url pr_base pr_head head_repository is_cross_repository head_ref; do
+    [[ -z "$url" ]] && continue
+    if [[ "$head_repository" == "$GITHUB_REPOSITORY" && "$is_cross_repository" == "false" && \
+      "$head_ref" == "$branch" ]]; then
+      printf '%s\t%s\t%s\t%s\t%s\n' \
+        "$url" "$pr_base" "$pr_head" "$head_repository" "$is_cross_repository"
+      return 0
+    fi
+  done <<< "$records"
 }
 
 verify_pr_record() {
-  local record=$1 url pr_base pr_head
-  IFS=$'\t' read -r url pr_base pr_head <<< "$record"
-  if [[ -z "$url" || "$pr_base" != "$BASE_SHA" || "$pr_head" != "$remote_head" ]]; then
+  local record=$1 url pr_base pr_head head_repository is_cross_repository
+  IFS=$'\t' read -r url pr_base pr_head head_repository is_cross_repository <<< "$record"
+  if [[ -z "$url" || "$pr_base" != "$BASE_SHA" || "$pr_head" != "$remote_head" || \
+    "$head_repository" != "$GITHUB_REPOSITORY" || "$is_cross_repository" != "false" ]]; then
     echo "::error::Existing sync pull request does not match the validated candidate"
     return 1
   fi
@@ -84,8 +97,9 @@ if ! url=$(gh pr create --head "$branch" --base "$DOWNSTREAM_BRANCH" \
   exit 0
 fi
 
-record=$(gh pr view "$url" --json url,baseRefOid,headRefOid \
-  --jq '[.url, .baseRefOid, .headRefOid] | @tsv')
+record=$(gh pr view "$url" \
+  --json url,baseRefOid,headRefOid,headRepository,isCrossRepository \
+  --jq '[.url, .baseRefOid, .headRefOid, .headRepository.nameWithOwner, .isCrossRepository] | @tsv')
 if ! verify_pr_record "$record"; then
   gh pr close "$url" --comment \
     "Closed automatically because the pull request no longer matches the validated base and candidate head."

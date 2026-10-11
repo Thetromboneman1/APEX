@@ -70,10 +70,19 @@ def record():
 
 def emit(item):
     if item:
-        print("\\t".join((item["url"], item["base"], item["head"])))
+        fields = [item["url"], item["base"], item["head"]]
+        if args[:1] == ["api"] or any("headRepository" in arg for arg in args):
+            fields.append(item["head_repository"])
+        if args[:1] == ["api"] or any("isCrossRepository" in arg for arg in args):
+            fields.append("true" if item["is_cross_repository"] else "false")
+        if args[:1] == ["api"]:
+            fields.append(item.get("head_ref", os.environ["EXPECTED_BRANCH"]))
+        print("\\t".join(fields))
 
-if args[:2] == ["pr", "list"]:
-    emit(record())
+if args[:1] == ["api"]:
+    items = record()
+    for item in items if isinstance(items, list) else [items]:
+        emit(item)
 elif args[:2] == ["pr", "create"]:
     count.write_text(count.read_text() + "1\\n" if count.exists() else "1\\n")
     branch = args[args.index("--head") + 1]
@@ -85,13 +94,18 @@ elif args[:2] == ["pr", "create"]:
         "url": "https://example.invalid/pull/1",
         "base": "f" * 40 if os.environ.get("GH_STALE_BASE") == "1" else os.environ["BASE_SHA"],
         "head": head,
+        "head_repository": os.environ.get(
+            "GH_CREATED_HEAD_REPOSITORY", os.environ["GITHUB_REPOSITORY"],
+        ),
+        "is_cross_repository": os.environ.get("GH_CREATED_CROSS_REPOSITORY") == "1",
     }
     state.write_text(json.dumps(item), encoding="utf-8")
     if os.environ.get("GH_CREATE_RACE") == "1":
         raise SystemExit(1)
     print(item["url"])
 elif args[:2] == ["pr", "view"]:
-    emit(record())
+    items = record()
+    emit(items[-1] if isinstance(items, list) else items)
 elif args[:2] == ["pr", "close"]:
     close_count.write_text("1\\n")
 else:
@@ -119,6 +133,10 @@ else:
             "EXPECTED_TREE": self.tree,
             "DOWNSTREAM_BRANCH": "main",
             "UPSTREAM_REPOSITORY": "example/upstream",
+            "GITHUB_REPOSITORY": "example/downstream",
+            "EXPECTED_BRANCH": (
+                f"automation/upstream-sync-{self.base[:12]}-{self.upstream[:12]}"
+            ),
         })
         env.update(extra_env)
         return subprocess.run(
@@ -149,6 +167,91 @@ else:
 
         self.assertIn("https://example.invalid/pull/1", result.stdout)
         self.assertEqual(self.create_count.read_text().splitlines(), ["1"])
+
+    def test_inbound_fork_pr_with_same_branch_name_is_not_reused(self):
+        self.state.write_text(json.dumps({
+            "url": "https://example.invalid/pull/fork",
+            "base": self.base,
+            "head": self.git("rev-parse", "HEAD").stdout.strip(),
+            "head_repository": "attacker/APEX",
+            "is_cross_repository": True,
+        }), encoding="utf-8")
+
+        result = self.finalize()
+
+        self.assertNotIn("https://example.invalid/pull/fork", result.stdout)
+        self.assertIn("https://example.invalid/pull/1", result.stdout)
+        self.assertEqual(self.create_count.read_text().splitlines(), ["1"])
+
+    def test_created_pr_is_closed_if_revalidation_reports_a_fork_head(self):
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.finalize(
+                GH_CREATED_HEAD_REPOSITORY="attacker/APEX",
+                GH_CREATED_CROSS_REPOSITORY="1",
+            )
+
+        self.assertEqual(self.close_count.read_text(), "1\n")
+
+    def test_create_race_does_not_reuse_inbound_fork_winner(self):
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.finalize(
+                GH_CREATE_RACE="1",
+                GH_CREATED_HEAD_REPOSITORY="attacker/APEX",
+                GH_CREATED_CROSS_REPOSITORY="1",
+            )
+
+        self.assertFalse(self.close_count.exists())
+
+    def test_fork_candidate_before_same_repo_candidate_reuses_owned_pr(self):
+        candidate = self.git("rev-parse", "HEAD").stdout.strip()
+        self.state.write_text(json.dumps([
+            {
+                "url": "https://example.invalid/pull/fork",
+                "base": self.base,
+                "head": candidate,
+                "head_repository": "attacker/APEX",
+                "is_cross_repository": True,
+            },
+            {
+                "url": "https://example.invalid/pull/owned",
+                "base": self.base,
+                "head": candidate,
+                "head_repository": "example/downstream",
+                "is_cross_repository": False,
+            },
+        ]), encoding="utf-8")
+
+        result = self.finalize()
+
+        self.assertNotIn("https://example.invalid/pull/fork", result.stdout)
+        self.assertIn("https://example.invalid/pull/owned", result.stdout)
+        self.assertFalse(self.create_count.exists())
+
+    def test_owned_pr_is_found_after_more_than_thirty_fork_candidates(self):
+        candidate = self.git("rev-parse", "HEAD").stdout.strip()
+        forks = [
+            {
+                "url": f"https://example.invalid/pull/fork-{index}",
+                "base": self.base,
+                "head": candidate,
+                "head_repository": f"attacker-{index}/APEX",
+                "is_cross_repository": True,
+            }
+            for index in range(31)
+        ]
+        owned = {
+            "url": "https://example.invalid/pull/owned",
+            "base": self.base,
+            "head": candidate,
+            "head_repository": "example/downstream",
+            "is_cross_repository": False,
+        }
+        self.state.write_text(json.dumps([*forks, owned]), encoding="utf-8")
+
+        result = self.finalize()
+
+        self.assertIn("https://example.invalid/pull/owned", result.stdout)
+        self.assertFalse(self.create_count.exists())
 
     def test_fast_forward_candidate_is_published_and_reused(self):
         ff_origin = self.root / "ff-origin.git"
