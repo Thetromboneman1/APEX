@@ -39,7 +39,7 @@
 ![APEX system architecture](docs/architecture/apex-system-architecture.png)
 
 - **Default branch:** `main`
-- **Implementation fingerprint:** `ad088287964f1f85`
+- **Implementation fingerprint:** `153fe4ead4a241d9`
 - **Detected structure:** Automation modules, GitHub Actions, Tests and validation, Maintained documentation.
 - **Documentation contract:** editable diagram sources, committed PNG renderings,
   resolved local image links, and generated state are checked on every commit.
