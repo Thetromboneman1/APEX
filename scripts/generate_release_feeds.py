@@ -318,7 +318,9 @@ def main():
             releases = json.loads(resp.read().decode('utf-8'))
     except Exception as e:
         print(f"❌ Failed to fetch GitHub releases from API: {e}")
-        return
+        # An unavailable inventory is not a successfully fetched empty list.
+        # Fail before touching the existing published feed files.
+        raise SystemExit(1) from e
 
     scratch_dir = Path("/tmp/apex_ipas")
     if scratch_dir.exists(): shutil.rmtree(scratch_dir)
