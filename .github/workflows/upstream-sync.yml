@@ -114,17 +114,11 @@ jobs:
             echo "::error::Downstream advanced during validation; refusing stale publication"
             exit 1
           fi
+          trusted_finalizer="$RUNNER_TEMP/finalize-upstream-sync.sh"
+          cp scripts/finalize-upstream-sync.sh "$trusted_finalizer"
           git fetch --no-tags "https://github.com/${UPSTREAM_REPOSITORY}.git" "$UPSTREAM_SHA"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git merge --no-edit "$UPSTREAM_SHA"
           test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_TREE"
-          branch="automation/upstream-sync-${UPSTREAM_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          git push --set-upstream origin "HEAD:refs/heads/$branch"
-          url=$(gh pr create --head "$branch" --base "$DOWNSTREAM_BRANCH" \
-            --title "chore: sync lowiqentity/APEX main" \
-            --body "Merges \`${UPSTREAM_REPOSITORY}@${UPSTREAM_SHA}\` through the downstream validation contract. Validated base: \`${BASE_SHA}\`.")
-          if [[ "$(gh pr view "$url" --json baseRefOid --jq .baseRefOid)" != "$BASE_SHA" ]]; then
-            gh pr close "$url" --delete-branch --comment "Closed automatically because the base branch advanced after validation."
-            exit 1
-          fi
+          bash "$trusted_finalizer"
