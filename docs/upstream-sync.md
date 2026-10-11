@@ -4,7 +4,7 @@
 
 ## Automated path
 
-`.github/workflows/upstream-sync.yml` runs weekly and supports manual dispatch. It fetches upstream `main`, creates an `automation/upstream-sync-<sha>` review branch, merges there, runs `scripts/validate-downstream.sh`, and opens a pull request only after validation passes. It never force-pushes or rewrites downstream history.
+`.github/workflows/upstream-sync.yml` runs weekly and supports manual dispatch. It fetches upstream `main`, creates an `automation/upstream-sync-<base-sha>-<upstream-sha>` review branch, merges there, runs `scripts/validate-downstream.sh`, and opens or reuses a pull request only after validation passes. It never force-pushes or rewrites downstream history.
 
 If the merge conflicts, the workflow lists the files in the run summary, aborts the merge, and leaves `main` unchanged. Resolve those conflicts in a separate review branch. Do not change the workflow to prefer one side automatically because the JSON feeds contain downstream publishing decisions.
 
