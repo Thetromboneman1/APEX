@@ -10,25 +10,5 @@
     "blue": 0.4
   },
   "iconURL": "https://raw.githubusercontent.com/lowiqentity/APEX/main/Assets/repo_icon.png",
-  "apps": [
-    {
-      "name": "YouTube",
-      "bundleIdentifier": "com.google.ios.youtube",
-      "developerName": "lowiqentity",
-      "localizedDescription": "APEX is a build of YouTube with custom enhancements.\n\nFeatures:\n- Injected with APEXHook & FlexCore",
-      "version": "21.39.4",
-      "versionDate": "2026-09-29",
-      "size": 142427538,
-      "iconURL": "https://raw.githubusercontent.com/lowiqentity/APEX/main/Assets/repo_icon.png",
-      "downloadURL": "https://files.catbox.moe/l92jw1.ipa",
-      "minOSVersion": "17.0",
-      "supportedPlatforms": [
-        "iOS"
-      ],
-      "deviceFamilies": [
-        1,
-        2
-      ]
-    }
-  ]
+  "apps": []
 }
